@@ -1,0 +1,36 @@
+version: 2.1
+jobs:
+  build:
+    working_directory: ~/repo
+    docker:
+      - image: circleci/golang:1.16.0
+        user: root
+      - image: mtlynch/firestore-emulator
+        user: root
+    steps:
+      - setup_remote_docker
+      - checkout
+      - run:
+          name: Waiting for Firestore to be ready
+          command: |
+            for i in `seq 1 10`;
+            do
+              curl localhost:8080 && echo Ok && exit 0
+              echo -n .
+              sleep 1
+            done
+            echo Failed waiting for Firestore && exit 1
+      - restore_cache:
+          keys:
+            - go-mod-v4-{{ checksum "go.sum" }}
+      - run:
+          name: Install Go dependencies
+          command: go get ./...
+      - save_cache:
+          key: go-mod-v4-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
+      - run:
+          name: Run tests
+          command: |
+            make test
